@@ -11,6 +11,7 @@ _mag_project_list() {
   cache_file="$(_mag_status_cache_file)"
 
   _mag_status_refresh_async
+  _mag_size_refresh_async
 
   all=$(
     while IFS= read -r root; do
@@ -42,6 +43,11 @@ _mag_project_list() {
     if [ -f "$cache_file" ]; then
       awk -F'\t' '{ print "G\t" $0 }' "$cache_file"
     fi
+    local size_cache
+    size_cache="$(_mag_size_cache_file)"
+    if [ -f "$size_cache" ]; then
+      awk -F'\t' '{ print "Z\t" $0 }' "$size_cache"
+    fi
     printf '%s\n' "$all" | awk '{ print "A\t" $0 }'
   } | awk -F'\t' -v multi="$nroots" '
     BEGIN { n = split("39 208 114 177 81 203 220 141 75 215 156 168", pal, " ") }
@@ -50,6 +56,7 @@ _mag_project_list() {
     $1 == "P" { pinned[$2] = 1; next }
     $1 == "T" { tagsOf[$2] = $3; next }
     $1 == "G" { gdirty[$2] = $3; gahead[$2] = $4; next }
+    $1 == "Z" { sizekb[$2] = $3; next }
     {
       na++
       arel[na] = $2; aroot[na] = $3; aid[na] = $3 "/" $2
@@ -70,7 +77,7 @@ _mag_project_list() {
           if (!(aid[i] in pinned) && (aid[i] in rrank) && rrank[aid[i]] == r) emit(i, 0)
       for (i = 1; i <= na; i++) if (!(aid[i] in pinned) && !(aid[i] in rrank)) emit(i, 0)
     }
-    function emit(i, pin,   rel, root, cat, name, disp, parts, rp, nb, catp, namep, rootp, t, ta, m, j, tdisp, dot) {
+    function emit(i, pin,   rel, root, cat, name, disp, parts, rp, nb, catp, namep, rootp, t, ta, m, j, tdisp, dot, kb, sdisp) {
       rel = arel[i]; root = aroot[i]
       split(rel, parts, "/"); cat = parts[1]
       name = substr(rel, length(cat) + 2)
@@ -104,6 +111,14 @@ _mag_project_list() {
           if (ta[j] != "") tdisp = tdisp " \033[2m#" ta[j] "\033[0m"
         }
         disp = disp " " tdisp
+      }
+
+      if (aid[i] in sizekb) {
+        kb = sizekb[aid[i]] + 0
+        if (kb >= 1048576) sdisp = sprintf("%.1f GB", kb / 1048576)
+        else if (kb >= 1024) sdisp = sprintf("%.1f MB", kb / 1024)
+        else sdisp = kb " KB"
+        disp = disp " \033[2m" sdisp "\033[0m"
       }
 
       print disp "\t" rel "\t" root
